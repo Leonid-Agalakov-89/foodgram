@@ -17,7 +17,7 @@ services:
   
   backend:
     container_name: foodgram-back
-    build: ../backend
+    image: leonid89/foodgram-back:latest
     env_file: ../.env
     volumes:
       - static:/var/html/back_static/
@@ -27,7 +27,7 @@ services:
 
   frontend:
     container_name: foodgram-front
-    build: ../frontend
+    image: leonid89/foodgram-front:latest
     volumes:
       - ../frontend/:/app/result_build/
   nginx:
