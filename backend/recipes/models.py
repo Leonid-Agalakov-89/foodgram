@@ -29,7 +29,7 @@ class Tag(models.Model):
 
 
 class Ingredient(models.Model):
-    """ Модель 'Ингридиент' """
+    """ Модель 'Ингредиент' """
 
     name = models.CharField(
         max_length=128,
@@ -101,7 +101,7 @@ class Recipe(models.Model):
 
 
 class IngredientInRecipe(models.Model):
-    """ Модель количества нгридиента в рецепте """
+    """ Модель количества нгредиента в рецепте """
 
     recipe = models.ForeignKey(
         Recipe,

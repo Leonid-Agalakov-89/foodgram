@@ -1,6 +1,6 @@
 import random
 import string
-from datetime import datetime
+from django.utils import timezone
 
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
@@ -31,17 +31,14 @@ from recipes.models import (Favorite, Ingredient, IngredientInRecipe, Recipe,
 from users.models import Subscribe
 
 
-def generate_short_url():
-    characters = string.ascii_letters + string.digits
-    short_url = ''.join(random.sample(characters, k=4))
-    return 'http://foodgram89.line.pm/s/' + short_url
-
-
 class GetRecipeShortLink(APIView):
+    """View-класс для создания короткой ссылки на рецепт."""
 
     def get(self, request, recipe_id):
         recipe = get_object_or_404(Recipe, id=recipe_id)
-        short_url = generate_short_url()
+        characters = string.ascii_letters + string.digits
+        short_url = 'http://foodgram89.line.pm/s/' + (
+            ''.join(random.sample(characters, k=4)))
         link_obj, _ = ShortLink.objects.get_or_create(
             original_url=recipe.get_absolute_url(),
             defaults={'short_link': short_url}
@@ -88,12 +85,7 @@ class RecipeViewSet(ModelViewSet):
             return GetRecipeSerializer
         return RecipeSerializer
 
-    @action(
-        detail=True,
-        methods=['post', 'delete'],
-        permission_classes=[IsAuthenticated]
-    )
-    def favorite(self, request, pk):
+    def favorite_or_shopping_cart_mixin(self, request, pk, model):
         user = request.user
         if request.method == 'POST':
             try:
@@ -101,14 +93,22 @@ class RecipeViewSet(ModelViewSet):
             except Http404:
                 return Response('Рецепт не найден',
                                 status=status.HTTP_400_BAD_REQUEST)
-            return self.add_to(Favorite, user=user, recipe=recipe)
+            return self.add_to(model, user=user, recipe=recipe)
         else:
             try:
                 recipe = get_object_or_404(Recipe, id=pk)
             except Http404:
                 return Response('Рецепт не найден',
                                 status=status.HTTP_404_NOT_FOUND)
-            return self.delete_from(Favorite, user=user, recipe=recipe)
+            return self.delete_from(model, user=user, recipe=recipe)
+
+    @action(
+        detail=True,
+        methods=['post', 'delete'],
+        permission_classes=[IsAuthenticated]
+    )
+    def favorite(self, request, pk):
+        return self.favorite_or_shopping_cart_mixin(request, pk, Favorite)
 
     @action(
         detail=True,
@@ -116,21 +116,7 @@ class RecipeViewSet(ModelViewSet):
         permission_classes=[IsAuthenticated]
     )
     def shopping_cart(self, request, pk):
-        user = request.user
-        if request.method == 'POST':
-            try:
-                recipe = get_object_or_404(Recipe, id=pk)
-            except Http404:
-                return Response('Рецепт не найден',
-                                status=status.HTTP_400_BAD_REQUEST)
-            return self.add_to(ShoppingCart, user=user, recipe=recipe)
-        else:
-            try:
-                recipe = get_object_or_404(Recipe, id=pk)
-            except Http404:
-                return Response('Рецепт не найден',
-                                status=status.HTTP_404_NOT_FOUND)
-            return self.delete_from(ShoppingCart, user=user, recipe=recipe)
+        return self.favorite_or_shopping_cart_mixin(request, pk, ShoppingCart)
 
     def add_to(self, model, user, recipe):
         if model.objects.filter(user=user, recipe=recipe).exists():
@@ -165,8 +151,8 @@ class RecipeViewSet(ModelViewSet):
         ).values(
             'ingredient__name',
             'ingredient__measurement_unit'
-        ).annotate(amount=Sum('amount'))
-        today = datetime.today()
+        ).annotate(quantity=Sum('amount'))
+        today = timezone.now()
         shopping_list = (
             f'Список покупок для: {user.get_full_name()}\n\n'
             f'Дата: {today:%d-%m-%Y}\n\n'
@@ -174,7 +160,7 @@ class RecipeViewSet(ModelViewSet):
         shopping_list += '\n'.join([
             f'- {ingredient["ingredient__name"]} '
             f'({ingredient["ingredient__measurement_unit"]})'
-            f' - {ingredient["amount"]}'
+            f' - {ingredient["quantity"]}'
             for ingredient in ingredients
         ])
         shopping_list += f'\n\nFoodgram ({today:%Y})'
@@ -224,12 +210,11 @@ class CustomUserViewSet(UserViewSet):
             Subscribe.objects.create(user=user, author=author)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        if request.method == 'DELETE':
-            if subscription.exists():
-                subscription.delete()
-                return Response(status=status.HTTP_204_NO_CONTENT)
-            return Response({'error': 'Вы не подписаны на этого пользователя'},
-                            status=status.HTTP_400_BAD_REQUEST)
+        if subscription.exists():
+            subscription.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({'error': 'Вы не подписаны на этого пользователя'},
+                        status=status.HTTP_400_BAD_REQUEST)
 
     @action(
         detail=False,
@@ -257,7 +242,9 @@ class CustomUserViewSet(UserViewSet):
         """Метод для изменения аватарки пользователя"""
 
         if 'avatar' not in request.data:
-            return Response(['Contact phone field is required.'], status=400)
+            return Response(
+                {'error': 'Поле аватара является обязательным'},
+                status=status.HTTP_400_BAD_REQUEST)
         avatar = self.request.user
         serializer = AvatarSerializer(avatar, data=request.data)
         if serializer.is_valid():

@@ -1,7 +1,4 @@
-import base64
-
 from django.contrib.auth import get_user_model
-from django.core.files.base import ContentFile
 from django.db import transaction
 from djoser.serializers import UserCreateSerializer, UserSerializer
 from requests import Response
@@ -13,22 +10,12 @@ from api.constants import (COOKING_TIME_MIN_ERROR, COOKING_TIME_MIN_VALUE,
                            INGREDIENTS_EMPTY_ERROR, INGREDIENTS_FIELD_EMPTY,
                            INGREDIENTS_UNIQUE_ERROR, TAGS_EMPTY_ERROR,
                            TAGS_FIELD_EMPTY, TAGS_UNIQUE_ERROR)
+from api.fields import Base64ImageField
 from recipes.models import (Favorite, Ingredient, IngredientInRecipe, Recipe,
                             ShoppingCart, ShortLink, Tag)
 from users.models import Subscribe
 
 User = get_user_model()
-
-
-class Base64ImageField(serializers.ImageField):
-    """Кастомное поле для кодирования изображения в base64."""
-
-    def to_internal_value(self, data):
-        if isinstance(data, str) and data.startswith('data:image'):
-            format, imgstr = data.split(';base64,')
-            ext = format.split('/')[-1]
-            data = ContentFile(base64.b64decode(imgstr), name='photo.' + ext)
-        return super().to_internal_value(data)
 
 
 class CustomUserCreateSerializer(UserCreateSerializer):
@@ -203,7 +190,7 @@ class RecipeSerializer(serializers.ModelSerializer):
             raise ValidationError(INGREDIENTS_UNIQUE_ERROR)
         return data
 
-    def get_ingredients(self, recipe, ingredients):
+    def create_ingredients(self, recipe, ingredients):
         IngredientInRecipe.objects.bulk_create(
             IngredientInRecipe(
                 recipe=recipe,
@@ -217,7 +204,7 @@ class RecipeSerializer(serializers.ModelSerializer):
         ingredients = validated_data.pop('ingredients')
         recipe = Recipe.objects.create(**validated_data)
         recipe.tags.set(tags)
-        self.get_ingredients(recipe, ingredients)
+        self.create_ingredients(recipe, ingredients)
         return recipe
 
     @transaction.atomic
@@ -226,7 +213,7 @@ class RecipeSerializer(serializers.ModelSerializer):
         ingredients = validated_data.pop('ingredients')
         IngredientInRecipe.objects.filter(recipe=instance).delete()
         instance.tags.set(tags)
-        self.get_ingredients(instance, ingredients)
+        self.create_ingredients(instance, ingredients)
         return super().update(instance, validated_data)
 
     def to_representation(self, instance):
@@ -254,11 +241,6 @@ class GetRecipeSerializer(serializers.ModelSerializer):
         user = self.context.get('request').user
         if user.is_anonymous:
             return False
-        if object is None:
-            return Response(
-                {'errors': 'Рецепт уже удален!'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
         return object.favorites.filter(user=user).exists()
 
     def get_is_in_shopping_cart(self, object):

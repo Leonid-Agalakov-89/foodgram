@@ -7,9 +7,9 @@ SECRET_KEY = os.environ['SECRET_KEY']
 
 DEBUG = os.getenv('DEBUG', '').lower() in ('false', '0')
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1, localhost, backend:8000').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1, localhost').split(',')
 
-CSRF_TRUSTED_ORIGINS = ["https://foodgram89.line.pm"]
+CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', 'http://127.0.0.1, http://localhost').split(',')
 
 INSTALLED_APPS = [
     'django.contrib.admin',

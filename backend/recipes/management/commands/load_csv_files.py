@@ -6,7 +6,15 @@ from recipes.models import Ingredient
 
 
 class Command(BaseCommand):
-    help = 'Импорт данных из csv файлов в БД.'
+    """
+    Добавляем ингредиенты из файла CSV.
+    После миграции БД запускаем командой
+    python manage.py load_сsv_files локально
+    или
+    sudo docker-compose exec backend python manage.py load_сsv_files
+    на удаленном сервере.
+    Создает записи в модели Ingredient из списка.
+    """
 
     def handle(self, *args, **options):
         self.import_ingredients()

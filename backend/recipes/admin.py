@@ -32,10 +32,6 @@ class RecipeAdmin(admin.ModelAdmin):
               ('tags', 'cooking_time'),
               'favorites',)
 
-    def display_tags(self, obj):
-        return ', '.join([tag.name for tag in obj.tags.all()])
-    display_tags.short_description = 'Теги'
-
     def favorites(self, obj):
         return obj.favorites.count()
 
