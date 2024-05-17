@@ -108,14 +108,6 @@ class AvatarSerializer(CustomUserSerializer):
         model = User
         fields = ('avatar',)
 
-    # def validate(self, data):
-    #     avatar = data.get("avatar")
-    #     if not avatar:
-    #         raise ValidationError(
-    #             {'error': 'Поле аватара является обязательным'},
-    #             status=status.HTTP_400_BAD_REQUEST)
-    #     return data
-
     @transaction.atomic
     def create(self, validated_data):
         avatar = validated_data.pop('avatar')
