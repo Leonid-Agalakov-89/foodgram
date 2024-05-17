@@ -1,3 +1,4 @@
+import os
 import random
 import string
 
@@ -10,6 +11,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import (SAFE_METHODS, AllowAny,
                                         IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
@@ -37,7 +39,7 @@ class GetRecipeShortLink(APIView):
     def get(self, request, recipe_id):
         recipe = get_object_or_404(Recipe, id=recipe_id)
         characters = string.ascii_letters + string.digits
-        short_url = 'http://foodgram89.line.pm/s/' + (
+        short_url = str(os.environ['DOMEN']) + 's/' + (
             ''.join(random.sample(characters, k=4)))
         link_obj, _ = ShortLink.objects.get_or_create(
             original_url=recipe.get_absolute_url(),
@@ -85,50 +87,38 @@ class RecipeViewSet(ModelViewSet):
             return GetRecipeSerializer
         return RecipeSerializer
 
-    def favorite_or_shopping_cart_mixin(self, request, pk, model):
+    @action(
+        methods=['post', 'delete'],
+        url_path='(?P<request_type>favorite|shopping_cart)',
+        detail=True,
+        permission_classes=[IsAuthenticated]
+    )
+    def favorite_or_shopping_cart(self, request, pk=None, request_type=None):
         user = request.user
+        model = Favorite if request_type == 'favorite' else ShoppingCart
         if request.method == 'POST':
-            try:
-                recipe = get_object_or_404(Recipe, id=pk)
-            except Http404:
-                return Response('Рецепт не найден',
-                                status=status.HTTP_400_BAD_REQUEST)
-            return self.add_to(model, user=user, recipe=recipe)
-        else:
-            try:
-                recipe = get_object_or_404(Recipe, id=pk)
-            except Http404:
-                return Response('Рецепт не найден',
-                                status=status.HTTP_404_NOT_FOUND)
-            return self.delete_from(model, user=user, recipe=recipe)
+            return self.add_to(model, pk, user)
+        return self.delete_from(model, pk, user)
 
-    @action(
-        detail=True,
-        methods=['post', 'delete'],
-        permission_classes=[IsAuthenticated]
-    )
-    def favorite(self, request, pk):
-        return self.favorite_or_shopping_cart_mixin(request, pk, Favorite)
-
-    @action(
-        detail=True,
-        methods=['post', 'delete'],
-        permission_classes=[IsAuthenticated]
-    )
-    def shopping_cart(self, request, pk):
-        return self.favorite_or_shopping_cart_mixin(request, pk, ShoppingCart)
-
-    def add_to(self, model, user, recipe):
+    def add_to(self, model, pk, user):
+        try:
+            recipe = get_object_or_404(Recipe, pk=pk)
+        except Http404:
+            return Response(
+                'Рецепт не найден',
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if model.objects.filter(user=user, recipe=recipe).exists():
             return Response(
-                {'errors': 'Рецепт уже добавлен!'},
+                'Рецепт уже добавлен',
                 status=status.HTTP_400_BAD_REQUEST
             )
         model.objects.create(user=user, recipe=recipe)
         serializer = RecipeInfoSerializer(recipe)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    def delete_from(self, model, user, recipe):
+    def delete_from(self, model, pk, user):
+        recipe = get_object_or_404(Recipe, pk=pk)
         obj = model.objects.filter(user=user, recipe=recipe)
         if obj.exists():
             obj.delete()
@@ -242,15 +232,14 @@ class CustomUserViewSet(UserViewSet):
         """Метод для изменения аватарки пользователя"""
 
         if 'avatar' not in request.data:
-            return Response(
-                {'error': 'Поле аватара является обязательным'},
-                status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError(
+                ['Поле аватара является обязательным']
+            )
         avatar = self.request.user
         serializer = AvatarSerializer(avatar, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @change_avatar.mapping.delete
     def delete_avatar(self, request):
@@ -258,7 +247,6 @@ class CustomUserViewSet(UserViewSet):
 
         avatar = self.request.user
         serializer = AvatarSerializer(avatar, data=request.data)
-        if serializer.is_valid():
-            request.user.avatar.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+        request.user.avatar.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

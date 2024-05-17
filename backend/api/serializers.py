@@ -99,7 +99,7 @@ class SubscribeSerializer(CustomUserSerializer):
         return obj.recipes.count()
 
 
-class AvatarSerializer(serializers.ModelSerializer):
+class AvatarSerializer(CustomUserSerializer):
     """Сериализатор для аватарки."""
 
     avatar = Base64ImageField(allow_null=True, required=False)
@@ -107,6 +107,19 @@ class AvatarSerializer(serializers.ModelSerializer):
     class Meta(CustomUserSerializer.Meta):
         model = User
         fields = ('avatar',)
+
+    # def validate(self, data):
+    #     avatar = data.get("avatar")
+    #     if not avatar:
+    #         raise ValidationError(
+    #             {'error': 'Поле аватара является обязательным'},
+    #             status=status.HTTP_400_BAD_REQUEST)
+    #     return data
+
+    @transaction.atomic
+    def create(self, validated_data):
+        avatar = validated_data.pop('avatar')
+        return avatar
 
 
 class TagSerializer(serializers.ModelSerializer):
