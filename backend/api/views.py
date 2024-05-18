@@ -38,7 +38,7 @@ def redirect_to_full_link(request, short_link):
         link_obj = ShortLink.objects.get(
             short_link=str(os.environ['DOMEN']) + 's/' + short_link
         )
-        full_link = link_obj.original_url.replace('/api', '', 1)
+        full_link = link_obj.original_url.replace('/api', '', 1)[:-1]
         return redirect(full_link)
     except ShortLink.DoesNotExist:
         return HttpResponse({'error': 'Ссылка не найдена'},
