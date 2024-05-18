@@ -206,7 +206,7 @@ class ShortLink(models.Model):
         max_length=256,
         verbose_name='Полная ссылка рецепта',
     )
-    short_link = models.URLField(
+    short_link = models.CharField(
         max_length=32,
         unique=True,
         verbose_name='Короткая ссылка рецепта',

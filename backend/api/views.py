@@ -5,7 +5,7 @@ import string
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
 from django.http import Http404, HttpResponse
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet
@@ -33,8 +33,21 @@ from recipes.models import (Favorite, Ingredient, IngredientInRecipe, Recipe,
 from users.models import Subscribe
 
 
+def redirect_to_full_link(request, short_link):
+    try:
+        link_obj = ShortLink.objects.get(
+            short_link=str(os.environ['DOMEN']) + 's/' + short_link
+        )
+        full_link = link_obj.original_url.replace('/api', '', 1)
+        return redirect(full_link)
+    except ShortLink.DoesNotExist:
+        return HttpResponse({'error': 'Ссылка не найдена'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+
 class GetRecipeShortLink(APIView):
-    """View-класс для создания короткой ссылки на рецепт."""
+    """View-класс для создания короткой ссылки на рецепт
+    и редиректа с короткой ссылки на полную"""
 
     def get(self, request, recipe_id):
         recipe = get_object_or_404(Recipe, id=recipe_id)
