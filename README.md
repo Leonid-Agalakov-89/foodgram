@@ -6,8 +6,8 @@
 ## Проект доступен по ссылке:
 
 ```
-- https://foodgram89.line.pm
-- https://158.160.85.165
+- https://foodgram89.work.gd
+- https://91.238.222.222
 ```
 
 Проект позволяет:
@@ -26,8 +26,7 @@
     - DOCKER_USERNAME
     - DOCKER_PASSWORD
     - HOST - IP-адрес вашего сервера
-    - SSH_KEY - приватный ключ для вашего сервера
-    - SSH_PASSPHRASE - пароль от вашего сервера
+    - SSH_PASSWORD - пароль от вашего сервера
     - USER - имя пользователя от вашего сервера
     - TELEGRAM_TO - ваш ID в Telegram
     - TELEGRAM_TOKEN - токен вашего бота в Telegram (для отправки сообщений об успешном запуске проекта на сервере)
